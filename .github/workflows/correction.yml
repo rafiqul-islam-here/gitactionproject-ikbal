@@ -3,7 +3,7 @@ name: Build & Push Docker Images
 on:
   workflow_dispatch:
   release:
-    types: [published,edited]
+    types: [published, edited]
 
 env:
   DOCKERHUB_REPO: "empactit-project-test"
