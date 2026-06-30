@@ -54,6 +54,9 @@ jobs:
             exit 1
           fi
 
+
+# Build and push Docker image
+
   build:
     name: Build and Push Docker Image
     needs: validation
