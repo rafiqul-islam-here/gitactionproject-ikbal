@@ -1,0 +1,83 @@
+# name: Build & Push Docker Images
+
+# on:
+#   workflow_dispatch:
+#   release:
+#     types: [published, edited]
+
+# env:
+#     DOCKERHUB_REPO: "testrepo"
+
+# jobs:
+#   validation:
+#     name: Validation of the branch and tag
+#     runs-on: ubuntu-latest
+#     outputs:
+#         semantic_version: ${{steps.validation_id.outputs.semantic_version}}
+#         tag_label: ${{steps.validation_id.outputs.tag_label}}
+
+#     steps:
+#         - name: validation check
+#           id: validation_id
+#           shell: bash
+#           run: |
+#             CURRENT_BRANCH= "${{ github.event.release.target_commitish}}"
+#             CURRENT_TAG= "${{ github.event.release.tag_name}}"
+
+#             echo "current branch: $CURRENT_BRANCH"
+#             echo "current tag: $CURRENT_TAG"
+
+#             if [ "$CURRENT_BRANCH" == 'main' ] || [ "$CURRENT_BRANCH" == 'dev' ] || [ "$CURRENT_BRANCH" == 'staging' ]; then
+#                 if [$CURRENT_TAG=~^(v[0-9]+\.[0-9]+\.[0-9]+)-([a-z]+)$]; then
+#                     SEMANTIC_VERSION_PART="${BASH_REMATCH[1]}"
+#                     TAG_LABEL_PART="${BASH_REMATCH[2]}"
+#                     echo "Tag format is valid."
+#                   else
+#                      echo "'$CURRENT_TAG' doesn't match the required 'vX.Y.Z-label' pattern."
+#                      exit 1
+#                 fi
+
+#                 if [["$CURRENT_BRANCH" == "main" && "$TAG_LABEL_PART" != "prod"] || [["$CURRENT_BRANCH" == "dev" && "$TAG_LABEL_PART" != "dev"] || [["$CURRENT_BRANCH" == "staging" && "$TAG_LABEL_PART" != "staging"]]; then
+#                     echo "Validation Failed: $CURRENT_BRANCH branch cannot release '$TAG_LABEL_PART' tags."
+#                     exit 1
+#                 fi
+
+#                 echo "Validation passed"
+#                 echo "semantic_version=$SEMANTIC_VERSION_PART" >> $GITHUB_OUTPUT
+#                 echo "tag_label=$TAG_LABEL_PART" >> $GITHUB_OUTPUT
+
+#               else
+#                 echo "branch is invalid. it should be either main, dev or staging"
+#                 exit 1
+#             fi
+
+#   build:
+#     name: Build and Push Docker Image
+#     needs: validation
+#     runs-on: ubuntu-latest
+#     environment: ${{needs.validation.outputs.tag_label}}
+#     env: 
+#         semantic_version: ${{needs.validation.outputs.semantic_version}}
+#         tag_label: ${{needs.validation.outputs.tag_label}}
+
+#         mutable_tag: ${{ needs.validation.outputs.tag_label == 'prod' && 'latest' || needs.validation.outputs.tag_label }}
+
+#     steps:
+# # Checkout repo
+#       - name: Checkout
+#         uses: actions/checkout@v4
+
+# # Docker login
+#       - name: Login to DockerHub
+#         uses: docker/login-action@v3
+#         with:
+#           username: ${{ secrets.DOCKER_USERNAME }}
+#           password: ${{ secrets.DOCKER_TOKEN }}
+
+# # Frontend build & push
+#       - name: Build Frontend
+#         run: |
+#           docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKERHUB_REPO }}:${{ env.semantic_version }} ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKERHUB_REPO }}:${{ env.mutable_tag }} ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKERHUB_REPO }}:${{ github.event.release.tag_name }} ./frontend
+#           docker push ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKERHUB_REPO }}:${{ env.semantic_version }}
+#           docker push ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKERHUB_REPO }}:${{ env.mutable_tag }}
+#           docker push ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKERHUB_REPO }}:${{ github.event.release.tag_name }}          

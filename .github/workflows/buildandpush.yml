@@ -1,0 +1,103 @@
+# name: Static app
+# on:
+#   workflow_dispatch:
+#   release:
+#     types: [published, edited]
+
+# env:
+#   REGISTRY_URL: "specsappssouthcentralus.azurecr.io"
+#   IMAGE: "hopper-app"
+
+# jobs:
+#   check:
+#     name: Validate Release Branch and Tag
+#     runs-on: ubuntu-latest
+#     if: github.event.release.target_commitish == 'master' || github.event.release.target_commitish == 'develop' || github.event.release.target_commitish == 'staging'
+#     outputs:
+#       semver: ${{ steps.validation.outputs.semver }}
+#       label: ${{ steps.validation.outputs.label }}
+
+#     steps:
+#       - name: Validate Branch and Extract Tag Information
+#         id: validation
+#         shell: bash
+#         run: |
+#           RELEASE_BRANCH="${{ github.event.release.target_commitish }}"
+#           RELEASE_TAG="${{ github.event.release.tag_name }}"
+          
+#           echo "Target Branch: $RELEASE_BRANCH"
+#           echo "Release Tag: $RELEASE_TAG"
+          
+#           # 1. Validate Tag Format (must be vX.Y.Z-label)
+#           if [[ "$RELEASE_TAG" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+)-([a-z]+)$ ]]; then
+#               SEMVER_PART="${BASH_REMATCH[1]}"
+#               LABEL_PART="${BASH_REMATCH[2]}"
+#               echo "::notice::Tag format is valid."
+#           else
+#               # Use ::error:: to highlight the failure prominently
+#               echo "::error::Release tag '$RELEASE_TAG' does not match the required 'vX.Y.Z-label' pattern."
+#               exit 1
+#           fi
+
+#           echo "Extracted Semver: $SEMVER_PART"
+#           echo "Extracted Label: $LABEL_PART"
+          
+#           # 2. Enforce branch-to-tag label matching and exit immediately on failure
+#           if [ "$RELEASE_BRANCH" == "master" ]; then
+#               if [ "$LABEL_PART" != "production" ]; then
+#                   echo "::error::Validation Failed: master branch can only release 'production' tags (found '$LABEL_PART')."
+#                   exit 1
+#               fi
+#           elif [ "$RELEASE_BRANCH" == "develop" ]; then
+#               if [ "$LABEL_PART" != "develop" ]; then
+#                   echo "::error::Validation Failed: develop branch can only release 'develop' tags (found '$LABEL_PART')."
+#                   exit 1
+#               fi
+#           elif [ "$RELEASE_BRANCH" == "staging" ]; then
+#               if [ "$LABEL_PART" != "staging" ]; then
+#                   echo "::error::Validation Failed: staging branch can only release 'staging' tags (found '$LABEL_PART')."
+#                   exit 1
+#               fi
+#           fi
+          
+#           # If execution reaches here, validation was successful
+#           echo "::notice::Validation Successful! Branch '$RELEASE_BRANCH' matches tag label '$LABEL_PART'. Proceeding to build."
+          
+#           # Set the outputs to be consumed by the 'release' job
+#           echo "semver=$SEMVER_PART" >> $GITHUB_OUTPUT
+#           echo "label=$LABEL_PART" >> $GITHUB_OUTPUT
+          
+#   release:
+#     name: Build and Push Docker Image
+#     needs: check 
+#     runs-on: ubuntu-latest
+#     environment: ${{ needs.check.outputs.label }}
+#     env:
+#       SEMVER: ${{ needs.check.outputs.semver }}
+#       LABEL: ${{ needs.check.outputs.label }}
+#       # Define the mutable tag: 'latest' for production releases, otherwise develop or staging
+#       MUTABLE_TAG: ${{ needs.check.outputs.label == 'production' && 'latest' || needs.check.outputs.label }}
+
+#     steps:
+#       - name: Checkout Code
+#         uses: actions/checkout@v4
+#         with:
+#           ref: ${{ github.event.release.tag_name }}
+
+#       - name: Login to ACR
+#         uses: docker/login-action@v3
+#         with:
+#           registry: ${{ env.REGISTRY_URL }}
+#           username: ${{ secrets.ACR_SPECSAPPSSOUTHCENTRALUS_USERNAME }}
+#           password: ${{ secrets.ACR_SPECSAPPSSOUTHCENTRALUS_PASSWORD }}
+
+#       - name: Build and Push Docker Image
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: .
+#           file: Dockerfile
+#           push: true
+#           tags: |
+#             ${{ env.REGISTRY_URL }}/${{ env.IMAGE }}:${{ env.SEMVER }} 
+#             ${{ env.REGISTRY_URL }}/${{ env.IMAGE }}:${{ env.SEMVER }}-${{ env.LABEL }}
+#              ${{ env.REGISTRY_URL }}/${{ env.IMAGE }}:${{ env.MUTABLE_TAG }}
