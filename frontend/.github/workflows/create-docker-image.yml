@@ -15,7 +15,7 @@ jobs:
     outputs:
       semantic_version: ${{ steps.validation_id.outputs.semantic_version }}
       tag_label: ${{ steps.validation_id.outputs.tag_label }}
-
+# hello staging
     steps:
       - name: Validation check
         id: validation_id
